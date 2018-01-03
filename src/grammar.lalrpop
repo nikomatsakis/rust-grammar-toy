@@ -1,0 +1,74 @@
+use super::join;
+
+grammar;
+
+pub Ty: String = {
+    Ty0,
+};
+
+#[inline]
+Ty0: String = {
+    Ty1,
+    Bounds,
+    "impl" <Bounds> => format!("impl {}", <>),
+    "dyn" <Bounds> => format!("dyn {}", <>),
+};
+
+Bounds: String = {
+    <l:Bound> "+" <r:Bound> => format!("({} + {})", l, r),
+    <l:Bounds> "+" <r:Bound> => format!("({} + {})", l, r),
+};
+
+Bound: String = {
+    Id,
+    <n:Id> "<" <a:TyArgs> ">" => format!("{}<{}>", n, join(a)),
+    Lifetime,
+    "(" <Bounds> ")" => format!("({})", <>),
+};
+
+Ty1: String = {
+    "&" <Ty1> => format!("&{}", <>),
+    Id,
+    <n:Id> "<" <a:TyArgs> ">" => format!("{}<{}>", n, join(a)),
+    "(" <Ty0> ")" => format!("({})", <>),
+    "fn" "(" <a:Comma<Ty>> ")" "->" <r:Ty1> => format!("fn({}) -> {}", join(a), r),
+};
+
+TyArgs: Vec<String> = {
+    <Lifetimes> "," <Comma1<Ty>> => {
+        let (mut a, b) = (<>);
+        a.extend(b);
+        a
+    },
+    <Lifetimes> ","?,
+    <Comma1<Ty>>,
+};
+
+Lifetimes: Vec<String> = {
+    <Lifetime> => vec![<>],
+    <Lifetimes> "," <Lifetime> => {
+        let (mut v, l) = (<>);
+        v.push(l);
+        v
+    }
+};
+
+Comma<T>: Vec<T> = {
+    () => vec![],
+    Comma1<T>,
+};
+
+Comma1<T>: Vec<T> = {
+    T => vec![<>],
+    <v:Comma1<T>> "," <b:T> => {
+        let mut v = v;
+        v.push(b);
+        v
+    },
+    <v:Comma1<T>> "," => v
+};
+
+Id: String = r"[a-zA-Z][a-zA-Z0-9]*" => String::from(<>);
+
+Lifetime: String = r"'[a-zA-Z][a-zA-Z0-9]*" => String::from(<>);
+
